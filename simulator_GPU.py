@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+import pandas as pd
 
 class MissileParams:
     Jx = 3.03
@@ -356,7 +358,7 @@ class SimulatorGPU:
         Mzt = Ty * d
         Myt = Tz * d
 
-        thrust_new = torch.where((t - 1) * self.t_inter >= m_inter, torch.zeros_like(thrust), thrust)
+        thrust_new = torch.where(t >= m_inter, torch.zeros_like(thrust), thrust)
 
         M_alg_new[:, :6] = torch.stack([e1, e3, e5, e7, e9, e11], dim=1)
         M_alg_new[:, 6:12] = torch.stack([f_alpha, f_beta, f_gamma, fwx, fwy, fwz], dim=1)
@@ -450,8 +452,8 @@ import matplotlib.pyplot as plt
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 # 初始化仿真器
-t_end = 20.0  # 20 秒
-n_step = 2000  # 2000 步
+t_end = 24.0  # 20 秒
+n_step = 2400  # 2000 步
 batch_size = 1  # 单次仿真
 simulator = SimulatorGPU(t_end, n_step, batch_size, device)
 
@@ -505,3 +507,14 @@ plt.suptitle('Last 16 Variables (M_pde: 16)', y=1.02)
 plt.savefig('plot2.png')
 
 print("仿真完成，图表已保存为 'plot1.png' 和 'plot2.png'")
+
+# 合并所有变量
+all_labels = T_pde_labels + M_pde_labels
+all_data = np.vstack((T_pde, M_pde))  # [32, 2000]
+
+# 保存到 CSV 文件
+df = pd.DataFrame(all_data.T, columns=all_labels)
+df.insert(0, 'Time', time)
+df.to_csv('simulation_data.csv', index=False)
+
+print("仿真完成，所有变量已保存到 'simulation_data.csv'")
