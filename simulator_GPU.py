@@ -443,3 +443,65 @@ class SimulatorGPU:
             M_alg[:, :, t + 1] = M_alg_next
 
         return T_pde, M_pde  # 只返回 T_pde 和 M_pde，与原方法一致
+
+import matplotlib.pyplot as plt
+
+# 设置设备
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+# 初始化仿真器
+t_end = 20.0  # 20 秒
+n_step = 2000  # 2000 步
+batch_size = 1  # 单次仿真
+simulator = SimulatorGPU(t_end, n_step, batch_size, device)
+
+# 设置初始条件
+samples = torch.tensor([
+        3471.31099154196, -0.763399365336313, -3.06176266787756, 80000, 75000, -11000,
+        269.258240356725, 0.523598775598299, 0.872664625997165, 2000, 1000, -1000, 
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 734
+    ], device=device).view(1, -1)
+
+# 运行仿真
+T_pde, M_pde, T_alg, M_alg = simulator.simulate(samples)
+
+# 将结果移到 CPU 并转为 numpy 用于绘图
+T_pde = T_pde.cpu().numpy()[0]  # [6, 2000]
+M_pde = M_pde.cpu().numpy()[0]  # [26, 2000]
+time = simulator.time_steps.cpu().numpy()[0]  # [2000]
+
+# T_pde 变量名称
+T_pde_labels = ['vt', 'theta_t', 'psi_t', 'xt', 'yt', 'zt']
+# M_pde 变量名称
+M_pde_labels = ['vm', 'theta_m', 'psi_m', 'xm', 'ym', 'zm', 'alpha', 'beta', 
+                'theta_var', 'gamma', 'wx', 'wy', 'wz', 'z11', 'z12', 'z21', 
+                'z22', 'z31', 'z32', 'z41', 'z42', 'z51', 'z52', 'z61', 'z62', 'm_DD']
+
+# 第一张图：前 16 个变量 (T_pde 的 6 个 + M_pde 的前 10 个)
+plt.figure(figsize=(15, 10))
+for i in range(6):
+    plt.subplot(4, 4, i+1)
+    plt.plot(time, T_pde[i], label=T_pde_labels[i])
+    plt.xlabel('Time (s)')
+    plt.legend()
+for i in range(10):
+    plt.subplot(4, 4, i+7)
+    plt.plot(time, M_pde[i], label=M_pde_labels[i])
+    plt.xlabel('Time (s)')
+    plt.legend()
+plt.tight_layout()
+plt.suptitle('First 16 Variables (T_pde: 6, M_pde: 10)', y=1.02)
+plt.savefig('plot1.png')
+
+# 第二张图：后 16 个变量 (M_pde 的后 16 个)
+plt.figure(figsize=(15, 10))
+for i in range(16):
+    plt.subplot(4, 4, i+1)
+    plt.plot(time, M_pde[i+10], label=M_pde_labels[i+10])
+    plt.xlabel('Time (s)')
+    plt.legend()
+plt.tight_layout()
+plt.suptitle('Last 16 Variables (M_pde: 16)', y=1.02)
+plt.savefig('plot2.png')
+
+print("仿真完成，图表已保存为 'plot1.png' 和 'plot2.png'")
